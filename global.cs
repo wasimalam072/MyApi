@@ -1,0 +1,43 @@
+global using System.Text;
+global using System.ComponentModel.DataAnnotations;
+global using System.Text.Json.Serialization;
+global using System.IdentityModel.Tokens.Jwt;
+global using System.Security.Claims;
+global using System.Diagnostics;
+
+global using Serilog;
+
+global using Microsoft.AspNetCore.Authentication.JwtBearer;
+global using Microsoft.AspNetCore.Authorization;
+global using Microsoft.Extensions.Options;
+global using Microsoft.IdentityModel.Tokens;
+global using Microsoft.AspNetCore.Mvc;
+global using Microsoft.AspNetCore.Mvc.Versioning;
+global using Microsoft.AspNetCore.Mvc.ApiExplorer;
+global using Microsoft.OpenApi;
+global using Microsoft.AspNetCore.Identity;
+global using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.AspNetCore.Mvc.Filters;
+global using Microsoft.AspNetCore.Diagnostics;
+global using Microsoft.AspNetCore.Authorization.Policy;
+global using SignInResult = Microsoft.AspNetCore.Identity.SignInResult;
+
+global using MyApi.Common.Constants;
+global using MyApi.Data;
+global using MyApi.Message;
+global using MyApi.Features.Auth;
+global using MyApi.Models;
+global using System.Security.Cryptography;
+global using MyApi.Configuration;
+global using MyApi.Common.Exceptions;
+global using MyApi.Data.Seed;
+global using MyApi.Infrastructure.Authorization;
+global using MyApi.Features.Users;
+global using MyApi.Common.Constants.Extensions;
+global using ErrorCodes = MyApi.Common.Constants.ErrorCodes;
+global using MyApi.Infrastructure.Authentication;
+global using MyApi.Features.Permissions;
+global using MyApi.Common.Extensions;
+global using MyApi.Models.Auth;
+global using MyApi.Models.Users;
