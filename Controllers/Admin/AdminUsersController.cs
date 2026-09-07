@@ -15,8 +15,7 @@ public sealed class AdminUsersController : ControllerBase
     /// <summary>
     /// Returns all registered application users.
     ///
-    /// The caller must be an Admin or Manager and must have
-    /// the Users.View permission.
+    /// The caller must have the Users.View permission.
     /// </summary>
     [Authorize(Policy = Permissions.UsersView)]
     [HttpGet("[action]")]
@@ -29,6 +28,39 @@ public sealed class AdminUsersController : ControllerBase
     {
         ApiResponse<IReadOnlyList<RegisteredUserResponse>> response = await _adminUsersService.GetAllRegisteredUsersAsync(cancellationToken);
 
+        return StatusCode(response.StatusCode, response);
+    }
+
+    /// <summary>Creates a standard user account when the caller has Users.Create.</summary>
+    [Authorize(Policy = Permissions.UsersCreate)]
+    [HttpPost("[action]")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(ApiResponse<RegisterResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CreateUser([FromBody] RegisterRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _adminUsersService.CreateUserAsync(request, cancellationToken);
+        return StatusCode(response.StatusCode, response);
+    }
+
+    /// <summary>Updates a registered user's name and phone when the caller has Users.Update.</summary>
+    [Authorize(Policy = Permissions.UsersUpdate)]
+    [HttpPut("[action]/{userId}")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(ApiResponse<RegisteredUserResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> UpdateUser(
+        string userId, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _adminUsersService.UpdateUserAsync(userId, request, cancellationToken);
         return StatusCode(response.StatusCode, response);
     }
 

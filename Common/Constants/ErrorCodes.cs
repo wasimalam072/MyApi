@@ -54,6 +54,13 @@ public static class ErrorCodes
             "USER_DELETE_FAILED";
     }
 
+    public static class UserPermissions
+    {
+        public const string InvalidSelection = "PERMISSIONS_INVALID_SELECTION";
+        public const string VersionRequired = "PERMISSIONS_VERSION_REQUIRED";
+        public const string Conflict = "PERMISSIONS_CONFLICT";
+    }
+
     public static class General
     {
         public const string InternalServerError = "ERR_INTERNAL_SERVER_ERROR";
