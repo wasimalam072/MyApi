@@ -4,6 +4,7 @@ namespace MyApi.Controllers.Auth;
 /// Handles user authentication and account registration.
 /// </summary>
 [ApiController]
+[Produces("application/json")]
 [ApiVersion(VersionValue.Version_1)]
 [Route("api/v{version:apiVersion}/[controller]")]
 public sealed class AuthController : ControllerBase
@@ -27,7 +28,6 @@ public sealed class AuthController : ControllerBase
     /// </param>
     [AllowAnonymous]
     [HttpPost("[action]")]
-    [Produces("application/json")]
     [ProducesResponseType(typeof(ApiResponse<RegisterResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
@@ -52,10 +52,10 @@ public sealed class AuthController : ControllerBase
     /// </param>
     [AllowAnonymous]
     [HttpPost("[action]")]
-    [Produces("application/json")]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status423Locked)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {

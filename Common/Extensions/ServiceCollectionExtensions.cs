@@ -123,7 +123,7 @@ public static class ServiceCollectionExtensions
                     options.User.RequireUniqueEmail =
                         true;
 
-                    // Require verification before login.
+                    // Contact verification is optional until a confirmation workflow is available.
                     options.SignIn.RequireConfirmedEmail =
                         false;
 
@@ -240,6 +240,9 @@ public static class ServiceCollectionExtensions
                     options.Events =
                         new JwtBearerEvents
                         {
+                            OnTokenValidated = context => context.HttpContext.RequestServices
+                                .GetRequiredService<CurrentUserAuthorization>().RefreshAsync(context),
+
                             OnChallenge =
                                 async context =>
                                 {
@@ -332,6 +335,9 @@ public static class ServiceCollectionExtensions
     private static IServiceCollection AddApplicationServices(
         this IServiceCollection services)
     {
+        services.AddScoped<IUserPermissionService, UserPermissionService>();
+        services.AddScoped<CurrentUserAuthorization>();
+
         services.AddScoped<
             IAuthService,
             AuthService>();

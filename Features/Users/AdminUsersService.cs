@@ -5,11 +5,44 @@ public sealed class AdminUsersService : IAdminUsersService
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IUserResponseMapper _userResponseMapper;
     private readonly ILogger<AdminUsersService> _logger;
-    public AdminUsersService(UserManager<ApplicationUser> userManager, IUserResponseMapper userResponseMapper, ILogger<AdminUsersService> logger)
+    private readonly IAuthService _authService;
+    private readonly IUserService _userService;
+
+    public AdminUsersService(
+        UserManager<ApplicationUser> userManager,
+        IUserResponseMapper userResponseMapper,
+        ILogger<AdminUsersService> logger,
+        IAuthService authService,
+        IUserService userService)
     {
         _userManager = userManager;
         _userResponseMapper = userResponseMapper;
         _logger = logger;
+        _authService = authService;
+        _userService = userService;
+    }
+
+    public Task<ApiResponse<RegisterResponse>> CreateUserAsync(
+        RegisterRequest request, CancellationToken cancellationToken = default) =>
+        _authService.RegisterAsync(request, cancellationToken);
+
+    public async Task<ApiResponse<RegisteredUserResponse>> UpdateUserAsync(
+        string userId, UpdateUserRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return ApiResponse<RegisteredUserResponse>.CreateFailure(
+                StatusCodes.Status400BadRequest, "A valid user ID is required.",
+                ErrorCodes.Users.IdRequired, Activity.Current?.Id);
+        }
+
+        var response = await _userService.UpdateUserAsync(userId, request, cancellationToken);
+        return response.Success
+            ? ApiResponse<RegisteredUserResponse>.CreateSuccess(
+                response.StatusCode, "User profile updated successfully.", response.Data, response.TraceId)
+            : response;
     }
 
     public async Task<ApiResponse<IReadOnlyList<RegisteredUserResponse>>> GetAllRegisteredUsersAsync(CancellationToken cancellationToken = default)

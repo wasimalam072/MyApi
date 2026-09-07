@@ -1,107 +1,55 @@
 namespace MyApi.Infrastructure.Authentication;
 
 /// <summary>
-/// Creates JWT access tokens for authenticated users.
+/// Signs JWT access tokens from the user's resolved roles and permissions.
 /// </summary>
 public sealed class TokenService : ITokenService
 {
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly IPermissionService _permissionService;
     private readonly JwtSettings _settings;
+    private readonly SigningCredentials _signingCredentials;
 
-    public TokenService(
-        UserManager<ApplicationUser> userManager,
-        IPermissionService permissionService,
-        IOptions<JwtSettings> options)
+    public TokenService(IOptions<JwtSettings> options)
     {
-        _userManager = userManager;
-        _permissionService = permissionService;
         _settings = options.Value;
+        _signingCredentials = new SigningCredentials(
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Key)),
+            SecurityAlgorithms.HmacSha256);
     }
 
-    public async Task<TokenResult> CreateAccessTokenAsync(
+    public TokenResult CreateAccessToken(
         ApplicationUser user,
-        CancellationToken cancellationToken = default)
+        IReadOnlyList<string> roles,
+        IReadOnlyList<string> permissions)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(roles);
+        ArgumentNullException.ThrowIfNull(permissions);
 
-        DateTime expiresAtUtc =
-            DateTime.UtcNow.AddMinutes(
-                _settings.ExpirationMinutes);
-
-        IList<string> roles =
-            await _userManager.GetRolesAsync(user);
-
-        IReadOnlyList<string> permissions =
-            await _permissionService
-                .GetEffectivePermissionsAsync(user, cancellationToken);
-
+        DateTime now = DateTime.UtcNow;
+        DateTime expiresAtUtc = now.AddMinutes(_settings.ExpirationMinutes);
         List<Claim> claims =
         [
-            new(
-                JwtRegisteredClaimNames.Sub,
-                user.Id),
-
-            new(
-                JwtRegisteredClaimNames.Email,
-                user.Email ?? string.Empty),
-
-            new(
-                JwtRegisteredClaimNames.Jti,
-                Guid.NewGuid().ToString()),
-
-            new(
-                ClaimTypes.NameIdentifier,
-                user.Id),
-
-            new(
-                ClaimTypes.Name,
-                user.UserName ?? string.Empty)
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(ClaimTypes.NameIdentifier, user.Id),
+            new(ClaimTypes.Name, user.UserName ?? string.Empty)
         ];
 
-        // Role claims are used by:
-        // [Authorize(Roles = "Admin")]
-        claims.AddRange(
-            roles.Select(
-                role =>
-                    new Claim(
-                        ClaimTypes.Role,
-                        role)));
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        claims.AddRange(permissions.Select(permission => new Claim(CustomClaimTypes.Permission, permission)));
 
-        // Permission claims are used by authorization policies.
-        claims.AddRange(
-            permissions.Select(
-                permission =>
-                    new Claim(
-                        CustomClaimTypes.Permission,
-                        permission)));
-
-        SymmetricSecurityKey signingKey =
-            new(
-                Encoding.UTF8.GetBytes(
-                    _settings.Key));
-
-        SigningCredentials credentials =
-            new(
-                signingKey,
-                SecurityAlgorithms.HmacSha256);
-
-        JwtSecurityToken token =
-            new(
-                issuer: _settings.Issuer,
-                audience: _settings.Audience,
-                claims: claims, 
-                notBefore: DateTime.UtcNow,
-                expires: expiresAtUtc,
-                signingCredentials: credentials);
-
-        string accessToken =
-            new JwtSecurityTokenHandler()
-                .WriteToken(token);
+        var token = new JwtSecurityToken(
+            issuer: _settings.Issuer,
+            audience: _settings.Audience,
+            claims: claims,
+            notBefore: now,
+            expires: expiresAtUtc,
+            signingCredentials: _signingCredentials);
 
         return new TokenResult
         {
-            AccessToken = accessToken,
+            AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
             ExpiresAtUtc = expiresAtUtc
         };
     }

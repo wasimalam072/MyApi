@@ -1,8 +1,8 @@
 namespace MyApi.Features.Auth;
 
 /// <summary>
-/// Defines authentication operations such as
-/// user registration and login.
+/// Defines account registration and password authentication.
+/// Use one dependency-injection scope per request and await operations sequentially.
 /// </summary>
 public interface IAuthService
 {

@@ -23,8 +23,12 @@ public static class ErrorCodes
             "AUTH_ACCOUNT_EXISTS";
 
         public const string ConfigurationError =
-            "AUTH_CONFIGURATION_ERROR";        
-            
+            "AUTH_CONFIGURATION_ERROR";
+
+        public const string RegistrationFailed = "AUTH_REGISTRATION_FAILED";
+
+        public const string RoleAssignmentFailed = "AUTH_ROLE_ASSIGNMENT_FAILED";
+
         public const string InvalidApiKey =
             "INVALID_API_KEY";
 
@@ -48,6 +52,13 @@ public static class ErrorCodes
 
         public const string DeleteFailed =
             "USER_DELETE_FAILED";
+    }
+
+    public static class UserPermissions
+    {
+        public const string InvalidSelection = "PERMISSIONS_INVALID_SELECTION";
+        public const string VersionRequired = "PERMISSIONS_VERSION_REQUIRED";
+        public const string Conflict = "PERMISSIONS_CONFLICT";
     }
 
     public static class General

@@ -43,3 +43,6 @@ finally
 {
     await Log.CloseAndFlushAsync();
 }
+
+// Lets integration tests host the real application.
+public partial class Program { }
