@@ -123,7 +123,7 @@ public static class ServiceCollectionExtensions
                     options.User.RequireUniqueEmail =
                         true;
 
-                    // Require verification before login.
+                    // Contact verification is optional until a confirmation workflow is available.
                     options.SignIn.RequireConfirmedEmail =
                         false;
 

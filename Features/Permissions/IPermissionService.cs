@@ -9,5 +9,15 @@ public interface IPermissionService
     /// Returns all permissions available to a user from both
     /// direct user claims and claims inherited from assigned roles.
     /// </summary>
-    Task<IReadOnlyList<string>> GetEffectivePermissionsAsync(ApplicationUser user, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetEffectivePermissionsAsync(
+        ApplicationUser user,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resolves permissions without querying role names that the caller has already loaded.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetEffectivePermissionsAsync(
+        ApplicationUser user,
+        IEnumerable<string> roles,
+        CancellationToken cancellationToken = default);
 }

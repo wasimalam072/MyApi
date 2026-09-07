@@ -23,8 +23,12 @@ public static class ErrorCodes
             "AUTH_ACCOUNT_EXISTS";
 
         public const string ConfigurationError =
-            "AUTH_CONFIGURATION_ERROR";        
-            
+            "AUTH_CONFIGURATION_ERROR";
+
+        public const string RegistrationFailed = "AUTH_REGISTRATION_FAILED";
+
+        public const string RoleAssignmentFailed = "AUTH_ROLE_ASSIGNMENT_FAILED";
+
         public const string InvalidApiKey =
             "INVALID_API_KEY";
 

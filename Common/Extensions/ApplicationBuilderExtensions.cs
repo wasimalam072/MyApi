@@ -69,11 +69,6 @@ public static class ApplicationBuilderExtensions
     private static void ConfigureSwagger(
         WebApplication app)
     {
-        if (!app.Environment.IsDevelopment())
-        {
-            return;
-        }
-
         app.UseSwagger();
 
         app.UseSwaggerUI(

@@ -7,8 +7,12 @@ public sealed class UserService : IUserService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IUserResponseMapper _userResponseMapper;
-    private readonly ILogger<AuthService> _logger;
-    public UserService(UserManager<ApplicationUser> userManager, IUserResponseMapper userResponseMapper, ILogger<AuthService> logger)
+    private readonly ILogger<UserService> _logger;
+
+    public UserService(
+        UserManager<ApplicationUser> userManager,
+        IUserResponseMapper userResponseMapper,
+        ILogger<UserService> logger)
     {
         _userManager = userManager;
         _userResponseMapper = userResponseMapper;
@@ -98,6 +102,7 @@ public sealed class UserService : IUserService
 
     public async Task<ApiResponse<RegisteredUserResponse>> UpdateUserAsync(string currentUserId, UpdateUserRequest request, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
         string traceId =

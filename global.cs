@@ -18,7 +18,6 @@ global using Microsoft.OpenApi;
 global using Microsoft.AspNetCore.Identity;
 global using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 global using Microsoft.EntityFrameworkCore;
-global using Microsoft.AspNetCore.Mvc.Filters;
 global using Microsoft.AspNetCore.Diagnostics;
 global using Microsoft.AspNetCore.Authorization.Policy;
 global using SignInResult = Microsoft.AspNetCore.Identity.SignInResult;
