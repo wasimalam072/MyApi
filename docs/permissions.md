@@ -1,8 +1,14 @@
 # User permissions
 
 Admin and Manager accounts can assign and edit direct permissions for registered
-users. Users perform management actions according to their effective permissions:
-the union of direct grants and permissions inherited from their roles.
+users within each account's role limits. Admin inherits create, delete, update,
+and view; Manager inherits create, update, and view; User inherits update and
+view for their own account only. Effective permissions combine direct and
+inherited grants within those limits.
+
+For role assignment, see [User roles](roles.md). Admins appoint Managers;
+Managers can assign or remove the User role on ordinary accounts. Direct
+permission grants do not authorize assigning privileged roles.
 
 ## Endpoints
 
@@ -12,18 +18,18 @@ need `Authorization: Bearer <access-token>`.
 | Method | URL | Access | Purpose |
 | --- | --- | --- | --- |
 | GET | `/api/v1/permissions` | Admin or Manager | List assignable names and descriptions |
-| GET | `/api/v1/permissions/users/{userId}` | Admin or Manager | Read a user's grants, role permissions, and version |
-| PUT | `/api/v1/permissions/users/{userId}` | Admin or Manager | Replace the user's direct grants |
-| GET | `/api/v1/permissions/me` | Any authenticated user | Read the caller's current permissions |
+| GET | `/api/v1/permissions/GetUserPermissions/{userId}` | Admin or Manager | Read a user's grants, role permissions, and version |
+| PUT | `/api/v1/permissions/UpdateUserPermissions/{userId}` | Admin or Manager | Replace the user's direct grants |
+| GET | `/api/v1/permissions/GetMyPermissions` | Any authenticated user | Read the caller's current permissions |
 
 ## Assign or edit permissions
 
 1. Log in as an Admin or Manager through `POST /api/v1/auth/login`.
-2. Get the target user's permissions with `GET /api/v1/permissions/users/{userId}`.
+2. Get the target user's permissions with `GET /api/v1/permissions/GetUserPermissions/{userId}`.
 3. Copy `data.version` into the update request and supply the complete desired set:
 
 ```http
-PUT /api/v1/permissions/users/<registered-user-id>
+PUT /api/v1/permissions/UpdateUserPermissions/<registered-user-id>
 Authorization: Bearer <admin-or-manager-token>
 ApiKey: <configured-api-key>
 Content-Type: application/json
@@ -39,6 +45,10 @@ revokes that direct grant. Send `"permissions": []` to revoke all direct grants.
 Permission names are trimmed, matched without case sensitivity, converted to
 their canonical spelling, and deduplicated. Unknown, null, or blank names are
 rejected. Omitting the list is an error and never clears permissions implicitly.
+Requests exceeding the target user's role limits return `400` with
+`PERMISSIONS_INVALID_SELECTION`. For example, `Users.Delete` cannot be assigned
+to a Manager, and neither create nor delete can be assigned to a User. A direct
+grant cannot expand a User's access to other accounts.
 
 The response uses the existing `ApiResponse<T>` envelope. For example:
 
@@ -53,7 +63,7 @@ The response uses the existing `ApiResponse<T>` envelope. For example:
     "email": "user@example.com",
     "roles": ["User"],
     "assignedPermissions": ["Users.Update", "Users.View"],
-    "inheritedPermissions": [],
+    "inheritedPermissions": ["Users.Update", "Users.View"],
     "effectivePermissions": ["Users.Update", "Users.View"],
     "version": "<new-version>"
   },
@@ -71,23 +81,22 @@ target user, assigned permissions, and request trace ID.
 
 ## What users can do
 
-| Permission | Protected management endpoint |
-| --- | --- |
-| `Users.View` | `GET /api/v1/adminusers/AllRegisteredUsers` |
-| `Users.Create` | `POST /api/v1/adminusers/CreateUser` |
-| `Users.Update` | `PUT /api/v1/adminusers/UpdateUser/{userId}` |
-| `Users.Delete` | `DELETE /api/v1/adminusers/DeleteUser/{userId}` |
+| Permission | Endpoint | Account scope |
+| --- | --- | --- |
+| `Users.View` | `GET /api/v1/users/GetCurrentUser` | Caller only; target is taken from the token |
+| `Users.Update` | `PUT /api/v1/users/UpdateUser` | Caller only; target is taken from the token |
+| `Users.View` | `GET /api/v1/adminusers/AllRegisteredUsers` | Admin or Manager; all accounts |
+| `Users.Create` | `POST /api/v1/adminusers/CreateUser` | Admin or Manager |
+| `Users.Update` | `PUT /api/v1/adminusers/UpdateUser/{userId}` | Admin or Manager; selected account |
+| `Users.Delete` | `DELETE /api/v1/adminusers/DeleteUser/{userId}` | Admin only |
 
 `CreateUser` accepts `RegisterRequest` and creates a standard User account.
 `UpdateUser` accepts `UpdateUserRequest` (`fullName` and `phoneNumber`). These
-management permissions apply to registered accounts; they do not grant the Admin
-or Manager role or permission-delegation rights. Only Admin and Manager roles
-can call the permission-management endpoints, even if a normal user has all four
-management permissions.
-
-Public self-registration and the logged-in user's own profile endpoints retain
-their existing access rules. Management permissions govern the endpoints in the
-table above.
+permissions do not grant the Admin or Manager role. User accounts cannot access
+management endpoints, including requests targeting their own ID through
+`/adminusers`. They use the current-user endpoints instead. Supplying another
+user ID in the query string or profile request body does not change the target.
+Public self-registration remains available and always creates a User account.
 
 ## Active sessions and inherited permissions
 
@@ -98,15 +107,22 @@ Requests already authorized before an edit may finish. A deleted user's token is
 rejected with `401`.
 
 The encoded JWT contains a snapshot from login. For the current permissions in a
-client application, call `GET /api/v1/permissions/me`. The API checks the refreshed
+client application, call `GET /api/v1/permissions/GetMyPermissions`. The API checks the refreshed
 database state instead of trusting that old permission snapshot. This requires
 database reads on authenticated requests; authorization data is not cached.
 
 The edit endpoint changes direct user claims only. It preserves unrelated claims
 and role memberships. A permission granted through a role remains effective when
 its direct user grant is removed. In particular, seeded Admin accounts inherit
-all four permissions. The response separates assigned and inherited grants so a
-client can explain why access remains available.
+all four permissions, Managers inherit create/update/view, and Users inherit
+update/view. The response separates assigned and inherited grants so a client
+can explain why access remains available. Startup reconciles role grants to
+this matrix, including existing databases.
+
+Legacy direct grants outside the account's current role limits remain in
+`assignedPermissions` for review, but are excluded from `effectivePermissions`,
+login/profile/role responses, and request authorization. Removing all roles
+leaves the account with no effective permissions, even if direct grants remain.
 
 No schema migration is required. The implementation uses the existing Identity
 user-claim tables and user concurrency stamp.
@@ -130,9 +146,10 @@ dotnet test MyApi.sln
 The HTTP tests start the real API with an isolated SQLite database, generated
 administrator credentials, and actual Identity/JWT authentication. Every test
 disposes its database, including on assertion failure. They cover both Admin and
-Manager delegation, all four protected actions, replacement and revocation with
-old tokens, invalid requests, stale versions, preserved role/unrelated claims,
-ordinary-user denial, role removal, and deleted accounts.
+Manager delegation within role limits, all four protected actions, direct-grant
+replacement and revocation, invalid requests, stale versions, preserved
+role/unrelated claims, profile ownership, Manager delete denial, demotion with
+old tokens, role removal, legacy grants, seeding, and deleted accounts.
 
 For SQL Server, set `MYAPI_TEST_SQLSERVER` to a connection string for a local or
 dedicated test server and run:

@@ -10,10 +10,10 @@ public sealed class UserPermissionService(
     private static readonly IReadOnlyList<PermissionDefinitionResponse> Catalog = Array.AsReadOnly(
         ApplicationPermissions.All.Select(name => new PermissionDefinitionResponse(name, name switch
         {
-            ApplicationPermissions.UsersView => "View registered user accounts.",
-            ApplicationPermissions.UsersCreate => "Create accounts through user management.",
-            ApplicationPermissions.UsersUpdate => "Update registered users' names and phone numbers.",
-            ApplicationPermissions.UsersDelete => "Delete registered user accounts.",
+            ApplicationPermissions.UsersView => "View your own profile, or registered accounts as Admin or Manager.",
+            ApplicationPermissions.UsersCreate => "Create user accounts as Admin or Manager.",
+            ApplicationPermissions.UsersUpdate => "Update your own profile, or registered accounts as Admin or Manager.",
+            ApplicationPermissions.UsersDelete => "Delete registered user accounts as Admin.",
             _ => name
         })).ToArray());
 
@@ -89,6 +89,12 @@ public sealed class UserPermissionService(
             return Conflict(traceId);
         }
 
+        string[] roles = await GetRoleNamesAsync(user.Id, cancellationToken);
+        if (desired.Except(RolePermissions.ForRoles(roles), StringComparer.OrdinalIgnoreCase).Any())
+        {
+            return InvalidSelection("Permissions cannot exceed the user's current roles. Users can only view and update their own data; only Admins can delete accounts.", traceId);
+        }
+
         List<IdentityUserClaim<string>> currentClaims = await database.UserClaims
             .Where(claim => claim.UserId == user.Id && claim.ClaimType == CustomClaimTypes.Permission)
             .ToListAsync(cancellationToken);
@@ -135,11 +141,7 @@ public sealed class UserPermissionService(
     private async Task<UserPermissionsResponse> MapResponseAsync(
         ApplicationUser user, IEnumerable<string> assigned, CancellationToken cancellationToken)
     {
-        string[] roles = await (
-            from membership in database.UserRoles.AsNoTracking()
-            join role in database.Roles.AsNoTracking() on membership.RoleId equals role.Id
-            where membership.UserId == user.Id
-            select role.Name!).ToArrayAsync(cancellationToken);
+        string[] roles = await GetRoleNamesAsync(user.Id, cancellationToken);
 
         string[] inherited = await (
             from membership in database.UserRoles.AsNoTracking()
@@ -148,7 +150,7 @@ public sealed class UserPermissionService(
             select claim.ClaimValue!).ToArrayAsync(cancellationToken);
 
         string[] normalizedAssigned = Normalize(assigned);
-        string[] normalizedInherited = Normalize(inherited);
+        string[] normalizedInherited = RolePermissions.Constrain(inherited, roles);
         return new UserPermissionsResponse
         {
             UserId = user.Id,
@@ -157,10 +159,16 @@ public sealed class UserPermissionService(
             Roles = Normalize(roles),
             AssignedPermissions = normalizedAssigned,
             InheritedPermissions = normalizedInherited,
-            EffectivePermissions = Normalize(normalizedAssigned.Concat(normalizedInherited)),
+            EffectivePermissions = RolePermissions.Constrain(normalizedAssigned.Concat(normalizedInherited), roles),
             Version = user.ConcurrencyStamp ?? string.Empty
         };
     }
+
+    private Task<string[]> GetRoleNamesAsync(string userId, CancellationToken cancellationToken) => (
+        from membership in database.UserRoles.AsNoTracking()
+        join role in database.Roles.AsNoTracking() on membership.RoleId equals role.Id
+        where membership.UserId == userId
+        select role.Name!).ToArrayAsync(cancellationToken);
 
     private static string[] Normalize(IEnumerable<string> values) => values
         .Where(value => !string.IsNullOrWhiteSpace(value))

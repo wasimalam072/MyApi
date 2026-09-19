@@ -11,33 +11,32 @@ builder.Host.UseSerilog(
             .Enrich.FromLogContext();
     });
 
-builder.Services.AddApiServices(
-    builder.Configuration);
+builder.Services.AddApiServices(builder.Configuration);
 
-var app =
-    builder.Build();
+var app = builder.Build();
 
 app.UseApiPipeline();
 
 try
 {
-    Log.Information(
-        "Starting MyApi");
+    Log.Information("Starting MyApi in {Environment}", app.Environment.EnvironmentName);
 
-    await IdentitySeeder.SeedAsync(
-        app.Services,
-        app.Configuration);
+    if (app.Environment.IsDevelopment())
+    {
+        Log.Information("Running Development identity seeding.");
 
-    Log.Information(
-        "Identity initialization completed.");
+        await IdentitySeeder.SeedAsync(
+            app.Services,
+            app.Configuration);
+
+        Log.Information("Identity initialization completed.");
+    }
 
     await app.RunAsync();
 }
 catch (Exception exception)
 {
-    Log.Fatal(
-        exception,
-        "MyApi terminated unexpectedly.");
+    Log.Fatal(exception, "MyApi terminated unexpectedly.");
 }
 finally
 {

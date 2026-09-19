@@ -42,3 +42,5 @@ global using MyApi.Models.Auth;
 global using MyApi.Models.Users;
 global using MyApi.Models.Permissions;
 global using ApplicationPermissions = MyApi.Common.Constants.Permissions;
+global using MyApi.Models.Roles;
+global using MyApi.Features.Roles;

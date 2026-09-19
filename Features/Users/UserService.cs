@@ -23,9 +23,7 @@ public sealed class UserService : IUserService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        string traceId =
-            Activity.Current?.Id
-            ?? Guid.NewGuid().ToString();
+        string traceId = Activity.Current?.Id ?? Guid.NewGuid().ToString();
 
         // -------------------------------------------------------
         // VALIDATE USER ID
@@ -33,39 +31,30 @@ public sealed class UserService : IUserService
 
         if (string.IsNullOrWhiteSpace(currentUserId))
         {
-            _logger.LogWarning(
-                "Get user by ID rejected because UserId was empty. TraceId={TraceId}",
-                traceId);
+            _logger.LogWarning("Get user by ID rejected because UserId was empty. TraceId={TraceId}", traceId);
 
-            return ApiResponse<RegisteredUserResponse>
-    .CreateFailure(
-        StatusCodes.Status401Unauthorized,
-        "Your authentication information is invalid. Please sign in again.",
-        ErrorCodes.Authentication.UserIdMissing,
-        traceId);
+            return ApiResponse<RegisteredUserResponse>.CreateFailure(
+                StatusCodes.Status401Unauthorized,
+                "Your authentication information is invalid. Please sign in again.",
+                 ErrorCodes.Authentication.UserIdMissing,
+                 traceId);
         }
 
         // -------------------------------------------------------
         // REQUEST START
         // -------------------------------------------------------
 
-        _logger.LogInformation(
-            "Retrieving user by ID. TraceId={TraceId}",
-            traceId);
+        _logger.LogInformation("Retrieving user by ID. TraceId={TraceId}", traceId);
 
         // -------------------------------------------------------
         // FIND USER
         // -------------------------------------------------------
 
-        ApplicationUser? user =
-            await _userManager.FindByIdAsync(
-                currentUserId.Trim());
+        ApplicationUser? user = await _userManager.FindByIdAsync(currentUserId.Trim());
 
         if (user is null)
         {
-            _logger.LogWarning(
-                "Requested user was not found. TraceId={TraceId}",
-                traceId);
+            _logger.LogWarning("Requested user was not found. TraceId={TraceId}", traceId);
 
             return ApiResponse<RegisteredUserResponse>.CreateFailure(
                 StatusCodes.Status404NotFound,
@@ -78,22 +67,15 @@ public sealed class UserService : IUserService
         // MAP RESPONSE
         // -------------------------------------------------------
 
-        RegisteredUserResponse response =
-            await _userResponseMapper.MapAsync(
-                user,
-                cancellationToken);
+        RegisteredUserResponse response = await _userResponseMapper.MapAsync(user, cancellationToken);
 
         // -------------------------------------------------------
         // SUCCESS LOG
         // -------------------------------------------------------
 
-        _logger.LogInformation(
-            "User retrieved successfully. UserId={UserId} TraceId={TraceId}",
-            user.Id,
-            traceId);
+        _logger.LogInformation("User retrieved successfully. UserId={UserId} TraceId={TraceId}", user.Id, traceId);
 
-        return ApiResponse<RegisteredUserResponse>
-            .CreateSuccess(
+        return ApiResponse<RegisteredUserResponse>.CreateSuccess(
                 StatusCodes.Status200OK,
                 "User retrieved successfully.",
                 response,
@@ -103,69 +85,55 @@ public sealed class UserService : IUserService
     public async Task<ApiResponse<RegisteredUserResponse>> UpdateUserAsync(string currentUserId, UpdateUserRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+
         cancellationToken.ThrowIfCancellationRequested();
 
-        string traceId =
-            Activity.Current?.Id
-            ?? Guid.NewGuid().ToString();
+        string traceId = Activity.Current?.Id ?? Guid.NewGuid().ToString();
 
         // -------------------------------------------------------
         // VALIDATE CURRENT USER ID
         // -------------------------------------------------------
         if (string.IsNullOrWhiteSpace(currentUserId))
         {
-            _logger.LogWarning(
-            "Update user rejected because authenticated UserId was missing. TraceId={TraceId}",
-            traceId);
+            _logger.LogWarning("Update user rejected because authenticated UserId was missing. TraceId={TraceId}", traceId);
 
-            return ApiResponse<RegisteredUserResponse>
-                            .CreateFailure(
-                                StatusCodes.Status401Unauthorized,
-                                "Your authentication information is invalid. Please sign in again.",
-                                ErrorCodes.Authentication.UserIdMissing,
-                                traceId);
+            return ApiResponse<RegisteredUserResponse>.CreateFailure(
+                StatusCodes.Status401Unauthorized,
+                "Your authentication information is invalid. Please sign in again.",
+                ErrorCodes.Authentication.UserIdMissing,
+                traceId);
         }
 
         // -------------------------------------------------------
         // START LOG
         // -------------------------------------------------------
 
-        _logger.LogInformation(
-            "User profile update started. UserId={UserId} TraceId={TraceId}",
-            currentUserId,
-            traceId);
+        _logger.LogInformation("User profile update started. UserId={UserId} TraceId={TraceId}", currentUserId, traceId);
 
         // -------------------------------------------------------
         // FIND CURRENT USER
         // -------------------------------------------------------
 
-        ApplicationUser? user =
-            await _userManager.FindByIdAsync(
-                currentUserId.Trim());
+        ApplicationUser? user = await _userManager.FindByIdAsync(currentUserId.Trim());
 
         if (user is null)
         {
-            _logger.LogWarning(
-            "User profile update failed because authenticated user was not found. TraceId={TraceId}",
-            traceId);
+            _logger.LogWarning("User profile update failed because authenticated user was not found. TraceId={TraceId}", traceId);
 
-            return ApiResponse<RegisteredUserResponse>
-                            .CreateFailure(
-                                StatusCodes.Status404NotFound,
-                                "Your user account could not be found. Please sign in again.",
-                                ErrorCodes.Users.NotFound,
-                                traceId);
+            return ApiResponse<RegisteredUserResponse>.CreateFailure(
+                StatusCodes.Status404NotFound,
+                "Your user account could not be found. Please sign in again.",
+                ErrorCodes.Users.NotFound,
+                traceId);
         }
 
         // -------------------------------------------------------
         // NORMALIZE VALUES
         // -------------------------------------------------------
 
-        string fullName =
-            request.FullName.Trim();
+        string fullName = request.FullName.Trim();
 
-        string phoneNumber =
-            request.PhoneNumber.Trim();
+        string phoneNumber = request.PhoneNumber.Trim();
 
         // // -------------------------------------------------------
         // // CHECK PHONE NUMBER DUPLICATE
@@ -216,10 +184,10 @@ public sealed class UserService : IUserService
 
         if (!fullNameChanged && !phoneNumberChanged)
         {
-             RegisteredUserResponse current =
-                await _userResponseMapper.MapAsync(
-                    user,
-                    cancellationToken);
+            RegisteredUserResponse current =
+               await _userResponseMapper.MapAsync(
+                   user,
+                   cancellationToken);
 
             return ApiResponse<RegisteredUserResponse>
                 .CreateSuccess(

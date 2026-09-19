@@ -26,12 +26,13 @@ public sealed class PermissionConcurrencyTests
         await using var factory = await PermissionApiFactory.StartAsync(barrier);
         using var admin = await factory.LoginAsync(factory.AdminEmail);
         var registered = await factory.RegisterAsync();
-        string url = $"/api/v1/permissions/users/{registered.UserId}";
+        string url = $"/api/v1/permissions/GetUserPermissions/{registered.UserId}";
+        string updateUrl = $"/api/v1/permissions/UpdateUserPermissions/{registered.UserId}";
         var original = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(url));
 
         var responses = await Task.WhenAll(
-            admin.PutAsJsonAsync(url, new UpdateUserPermissionsRequest { Version = original.Version, Permissions = [Permissions.UsersView] }),
-            admin.PutAsJsonAsync(url, new UpdateUserPermissionsRequest { Version = original.Version, Permissions = [Permissions.UsersDelete] }))
+            admin.PutAsJsonAsync(updateUrl, new UpdateUserPermissionsRequest { Version = original.Version, Permissions = [Permissions.UsersView] }),
+                admin.PutAsJsonAsync(updateUrl, new UpdateUserPermissionsRequest { Version = original.Version, Permissions = [Permissions.UsersUpdate] }))
             .WaitAsync(TimeSpan.FromSeconds(45));
         try
         {

@@ -1,7 +1,7 @@
 namespace MyApi.Features.Permissions;
 
 /// <summary>
-/// Combines permissions assigned directly to a user and inherited from their roles.
+/// Combines direct and inherited permissions within the user's current role limits.
 /// </summary>
 public sealed class PermissionService : IPermissionService
 {
@@ -41,9 +41,10 @@ public sealed class PermissionService : IPermissionService
 
         var permissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         AddPermissions(permissions, await _userManager.GetClaimsAsync(user));
+        string[] currentRoles = roles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
         // Identity managers share a scoped DbContext; role queries must remain sequential.
-        foreach (string roleName in roles.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (string roleName in currentRoles)
         {
             cancellationToken.ThrowIfCancellationRequested();
             IdentityRole? role = await _roleManager.FindByNameAsync(roleName);
@@ -59,7 +60,7 @@ public sealed class PermissionService : IPermissionService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return permissions.OrderBy(permission => permission, StringComparer.OrdinalIgnoreCase).ToArray();
+        return RolePermissions.Constrain(permissions, currentRoles);
     }
 
     private static void AddPermissions(ISet<string> permissions, IEnumerable<Claim> claims)

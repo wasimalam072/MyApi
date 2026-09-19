@@ -12,22 +12,23 @@ public sealed class PermissionServiceTests
         using var context = new AuthTestContext();
         context.Users.Claims =
         [
-            new Claim(CustomClaimTypes.Permission, "Test.Write"),
-            new Claim(CustomClaimTypes.Permission, "test.read"),
+            new Claim(CustomClaimTypes.Permission, Permissions.UsersUpdate),
+            new Claim(CustomClaimTypes.Permission, "users.view"),
+            new Claim(CustomClaimTypes.Permission, Permissions.UsersCreate),
             new Claim(CustomClaimTypes.Permission, " "),
             new Claim(ClaimTypes.Name, "NotAPermission")
         ];
         context.Roles.Claims[context.Roles.RolesByName[ApplicationRoles.User].Id] =
         [
-            new Claim(CustomClaimTypes.Permission, "Test.Read"),
-            new Claim(CustomClaimTypes.Permission, "Test.Delete"),
+            new Claim(CustomClaimTypes.Permission, Permissions.UsersView),
+            new Claim(CustomClaimTypes.Permission, Permissions.UsersDelete),
             new Claim(CustomClaimTypes.Permission, "")
         ];
 
         var result = await context.Permissions.GetEffectivePermissionsAsync(
             AuthServiceTests.User(), new[] { ApplicationRoles.User, "USER", "MissingRole" });
 
-        Assert.Equal(new[] { "Test.Delete", "test.read", "Test.Write" }, result);
+        Assert.Equal(new[] { Permissions.UsersUpdate, Permissions.UsersView }, result);
         Assert.Equal(0, context.Users.RoleQueries);
         Assert.Equal(2, context.Roles.RoleQueries);
         Assert.Equal(1, context.Roles.ClaimQueries);
@@ -39,12 +40,12 @@ public sealed class PermissionServiceTests
         using var context = new AuthTestContext();
         var mapper = new UserResponseMapper(context.Users, context.Permissions);
         context.Users.RoleNames = [ApplicationRoles.User, "USER"];
-        context.Users.Claims = [new Claim(CustomClaimTypes.Permission, "Test.Read")];
+        context.Users.Claims = [new Claim(CustomClaimTypes.Permission, Permissions.UsersView)];
         var response = await mapper.MapAsync(AuthServiceTests.User());
 
         Assert.Equal("test-user", response.UserId);
         Assert.Equal(new[] { ApplicationRoles.User }, response.Roles);
-        Assert.Equal(new[] { "Test.Read" }, response.Permissions);
+        Assert.Equal(new[] { Permissions.UsersView }, response.Permissions);
         Assert.Equal(1, context.Users.RoleQueries);
         Assert.Equal(1, context.Users.ClaimQueries);
     }

@@ -14,54 +14,55 @@ namespace MyApi.IntegrationTests;
 public sealed class PermissionManagementTests
 {
     private const string ListUsers = "/api/v1/adminusers/AllRegisteredUsers";
-    private static string PermissionsUrl(string userId) => $"/api/v1/permissions/users/{userId}";
+    private static string PermissionsUrl(string userId) => $"/api/v1/permissions/GetUserPermissions/{userId}";
+    private static string UpdatePermissionsUrl(string userId) => $"/api/v1/permissions/UpdateUserPermissions/{userId}";
 
     [Theory]
     [InlineData(ApplicationRoles.Admin)]
     [InlineData(ApplicationRoles.Manager)]
-    public async Task Administrator_can_grant_replace_and_revoke_permissions_for_existing_tokens(string actorRole)
+    public async Task Direct_grants_can_be_edited_without_removing_inherited_permissions_or_expanding_user_scope(string actorRole)
     {
         await using var factory = await PermissionApiFactory.StartAsync();
         using var actor = await LoginActorAsync(factory, actorRole);
         var registered = await factory.RegisterAsync();
         using var user = await factory.LoginAsync(registered.Email);
         string url = PermissionsUrl(registered.UserId);
+        string updatePermissionsUrl = UpdatePermissionsUrl(registered.UserId);
 
         var catalog = await ApiAssert.Data<List<PermissionDefinitionResponse>>(actor.GetAsync("/api/v1/permissions"));
         Assert.Equal(Permissions.All.Order(), catalog.Select(permission => permission.Name).Order());
         await ApiAssert.Response<object>(user.GetAsync(ListUsers), HttpStatusCode.Forbidden);
         var original = await ApiAssert.Data<UserPermissionsResponse>(actor.GetAsync(url));
 
-        var granted = await ApiAssert.Data<UserPermissionsResponse>(actor.PutAsJsonAsync(url,
+        var granted = await ApiAssert.Data<UserPermissionsResponse>(actor.PutAsJsonAsync(updatePermissionsUrl,
             new UpdateUserPermissionsRequest { Version = original.Version, Permissions = [" users.view ", "Users.View"] }));
         Assert.Equal(new[] { Permissions.UsersView }, granted.AssignedPermissions);
-        Assert.Equal(granted.AssignedPermissions, granted.EffectivePermissions);
+        Assert.Equal(new[] { Permissions.UsersUpdate, Permissions.UsersView }, granted.EffectivePermissions);
         Assert.NotEqual(original.Version, granted.Version);
-        await ApiAssert.Data<List<RegisteredUserResponse>>(user.GetAsync(ListUsers));
-        var ownPermissions = await ApiAssert.Data<UserPermissionsResponse>(user.GetAsync("/api/v1/permissions/me"));
+        await ApiAssert.Response<object>(user.GetAsync(ListUsers), HttpStatusCode.Forbidden);
+        var ownPermissions = await ApiAssert.Data<UserPermissionsResponse>(user.GetAsync("/api/v1/permissions/GetMyPermissions"));
         Assert.Equal(granted.EffectivePermissions, ownPermissions.EffectivePermissions);
 
-        // This token contains Users.View in its original claims. Revocation must
-        // remove that old snapshot as well as deny the token issued before grant.
+        // A permission claim never grants a standard User access to other accounts.
         using var tokenWithGrant = await factory.LoginAsync(registered.Email);
-        var replaced = await ApiAssert.Data<UserPermissionsResponse>(actor.PutAsJsonAsync(url,
+        var replaced = await ApiAssert.Data<UserPermissionsResponse>(actor.PutAsJsonAsync(updatePermissionsUrl,
             new UpdateUserPermissionsRequest { Version = granted.Version, Permissions = [Permissions.UsersUpdate] }));
-        Assert.Equal(new[] { Permissions.UsersUpdate }, replaced.EffectivePermissions);
+        Assert.Equal(new[] { Permissions.UsersUpdate, Permissions.UsersView }, replaced.EffectivePermissions);
         await ApiAssert.Response<object>(user.GetAsync(ListUsers), HttpStatusCode.Forbidden);
         await ApiAssert.Response<object>(tokenWithGrant.GetAsync(ListUsers), HttpStatusCode.Forbidden);
 
         var target = await factory.RegisterAsync();
         string updateUrl = $"/api/v1/adminusers/UpdateUser/{target.UserId}";
         var update = new UpdateUserRequest { FullName = "Changed by delegated user", PhoneNumber = "+15555550102" };
-        var updated = await ApiAssert.Data<RegisteredUserResponse>(user.PutAsJsonAsync(updateUrl, update));
-        Assert.Equal(target.UserId, updated.UserId);
-        Assert.Equal(update.FullName, updated.FullName);
+        await ApiAssert.Response<object>(user.PutAsJsonAsync(updateUrl, update), HttpStatusCode.Forbidden);
 
-        var revoked = await ApiAssert.Data<UserPermissionsResponse>(actor.PutAsJsonAsync(url,
+        var revoked = await ApiAssert.Data<UserPermissionsResponse>(actor.PutAsJsonAsync(updatePermissionsUrl,
             new UpdateUserPermissionsRequest { Version = replaced.Version, Permissions = [] }));
         Assert.Empty(revoked.AssignedPermissions);
-        Assert.Empty(revoked.EffectivePermissions);
+        Assert.Equal(new[] { Permissions.UsersUpdate, Permissions.UsersView }, revoked.EffectivePermissions);
         await ApiAssert.Response<object>(user.PutAsJsonAsync(updateUrl, update), HttpStatusCode.Forbidden);
+        var own = await ApiAssert.Data<RegisteredUserResponse>(user.GetAsync("/api/v1/users/GetCurrentUser"));
+        Assert.Equal(registered.UserId, own.UserId);
     }
 
     [Fact]
@@ -72,13 +73,14 @@ public sealed class PermissionManagementTests
         var registered = await factory.RegisterAsync();
         using var user = await factory.LoginAsync(registered.Email);
         string url = PermissionsUrl(registered.UserId);
+        string updatePermissionsUrl = UpdatePermissionsUrl(registered.UserId);
         var state = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(url));
-        var granted = await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(url,
-            new UpdateUserPermissionsRequest { Version = state.Version, Permissions = Permissions.All.ToArray() }));
+        var granted = await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(updatePermissionsUrl,
+            new UpdateUserPermissionsRequest { Version = state.Version, Permissions = [Permissions.UsersUpdate, Permissions.UsersView] }));
 
         await ApiAssert.Response<object>(user.GetAsync("/api/v1/permissions"), HttpStatusCode.Forbidden);
         await ApiAssert.Response<object>(user.GetAsync(url), HttpStatusCode.Forbidden);
-        await ApiAssert.Response<object>(user.PutAsJsonAsync(url,
+        await ApiAssert.Response<object>(user.PutAsJsonAsync(updatePermissionsUrl,
             new UpdateUserPermissionsRequest { Version = granted.Version, Permissions = [] }), HttpStatusCode.Forbidden);
         var unchanged = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(url));
         Assert.Equal(granted.Version, unchanged.Version);
@@ -96,11 +98,12 @@ public sealed class PermissionManagementTests
         using var admin = await factory.LoginAsync(factory.AdminEmail);
         var registered = await factory.RegisterAsync();
         string url = PermissionsUrl(registered.UserId);
+        string updatePermissionsUrl = UpdatePermissionsUrl(registered.UserId);
         var state = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(url));
-        var granted = await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(url,
+        var granted = await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(updatePermissionsUrl,
             new UpdateUserPermissionsRequest { Version = state.Version, Permissions = [Permissions.UsersView] }));
 
-        var error = await ApiAssert.Response<object>(admin.PutAsJsonAsync(url,
+        var error = await ApiAssert.Response<object>(admin.PutAsJsonAsync(updatePermissionsUrl,
             new { version = granted.Version, permissions = new[] { Permissions.UsersDelete, invalid } }), HttpStatusCode.BadRequest);
         Assert.Equal(ErrorCodes.UserPermissions.InvalidSelection, error.ErrorCode);
         var unchanged = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(url));
@@ -115,11 +118,12 @@ public sealed class PermissionManagementTests
         using var admin = await factory.LoginAsync(factory.AdminEmail);
         var registered = await factory.RegisterAsync();
         string url = PermissionsUrl(registered.UserId);
+        string updatePermissionsUrl = UpdatePermissionsUrl(registered.UserId);
         var state = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(url));
-        await ApiAssert.Response<object>(admin.PutAsJsonAsync(url, new { version = state.Version }), HttpStatusCode.BadRequest);
-        await ApiAssert.Response<object>(admin.PutAsJsonAsync(url, new { permissions = Array.Empty<string>() }), HttpStatusCode.BadRequest);
+        await ApiAssert.Response<object>(admin.PutAsJsonAsync(updatePermissionsUrl, new { version = state.Version }), HttpStatusCode.BadRequest);
+        await ApiAssert.Response<object>(admin.PutAsJsonAsync(updatePermissionsUrl, new { permissions = Array.Empty<string>() }), HttpStatusCode.BadRequest);
         await ApiAssert.Response<object>(admin.GetAsync(PermissionsUrl("missing-user")), HttpStatusCode.NotFound);
-        await ApiAssert.Response<object>(admin.PutAsJsonAsync(PermissionsUrl("missing-user"),
+        await ApiAssert.Response<object>(admin.PutAsJsonAsync(UpdatePermissionsUrl("missing-user"),
             new UpdateUserPermissionsRequest { Version = state.Version, Permissions = [] }), HttpStatusCode.NotFound);
     }
 
@@ -131,11 +135,12 @@ public sealed class PermissionManagementTests
         using var manager = await LoginActorAsync(factory, ApplicationRoles.Manager);
         var registered = await factory.RegisterAsync();
         string url = PermissionsUrl(registered.UserId);
+        string updatePermissionsUrl = UpdatePermissionsUrl(registered.UserId);
         var original = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(url));
-        var saved = await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(url,
+        var saved = await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(updatePermissionsUrl,
             new UpdateUserPermissionsRequest { Version = original.Version, Permissions = [Permissions.UsersView] }));
 
-        var conflict = await ApiAssert.Response<object>(manager.PutAsJsonAsync(url,
+        var conflict = await ApiAssert.Response<object>(manager.PutAsJsonAsync(updatePermissionsUrl,
             new UpdateUserPermissionsRequest { Version = original.Version, Permissions = [Permissions.UsersDelete] }), HttpStatusCode.Conflict);
         Assert.Equal(ErrorCodes.UserPermissions.Conflict, conflict.ErrorCode);
         var current = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(url));
@@ -159,38 +164,38 @@ public sealed class PermissionManagementTests
             Assert.True((await users.AddClaimAsync(account, new Claim("Department", "Support"))).Succeeded);
         }
         string url = PermissionsUrl(registered.UserId);
+        string updatePermissionsUrl = UpdatePermissionsUrl(registered.UserId);
         var state = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(url));
-        var added = await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(url,
-            new UpdateUserPermissionsRequest { Version = state.Version, Permissions = [Permissions.UsersDelete] }));
-        var cleared = await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(url,
+        var added = await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(updatePermissionsUrl,
+            new UpdateUserPermissionsRequest { Version = state.Version, Permissions = [Permissions.UsersUpdate] }));
+        var cleared = await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(updatePermissionsUrl,
             new UpdateUserPermissionsRequest { Version = added.Version, Permissions = [] }));
         Assert.Empty(cleared.AssignedPermissions);
-        Assert.Equal(new[] { Permissions.UsersView }, cleared.InheritedPermissions);
+        Assert.Equal(new[] { Permissions.UsersUpdate, Permissions.UsersView }, cleared.InheritedPermissions);
         Assert.Equal(cleared.InheritedPermissions, cleared.EffectivePermissions);
         await using var database = factory.CreateDbContext();
         Assert.True(await database.UserClaims.AnyAsync(claim => claim.UserId == registered.UserId && claim.ClaimType == "Department" && claim.ClaimValue == "Support"));
     }
 
-    [Fact]
-    public async Task Delegated_create_and_delete_permissions_control_the_management_endpoints()
+    [Theory]
+    [InlineData(ApplicationRoles.User, Permissions.UsersCreate)]
+    [InlineData(ApplicationRoles.User, Permissions.UsersDelete)]
+    [InlineData(ApplicationRoles.Manager, Permissions.UsersDelete)]
+    public async Task Direct_grants_cannot_exceed_the_target_users_role(string role, string forbiddenPermission)
     {
         await using var factory = await PermissionApiFactory.StartAsync();
         using var admin = await factory.LoginAsync(factory.AdminEmail);
         var registered = await factory.RegisterAsync();
-        using var user = await factory.LoginAsync(registered.Email);
-        var request = factory.NewRegistration();
-        const string createUrl = "/api/v1/adminusers/CreateUser";
-        await ApiAssert.Response<object>(user.PostAsJsonAsync(createUrl, request), HttpStatusCode.Forbidden);
+        if (role == ApplicationRoles.Manager)
+            await SetRoleAsync(factory, registered.UserId, ApplicationRoles.Manager, add: true);
         var state = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(PermissionsUrl(registered.UserId)));
-        await ApiAssert.Data<UserPermissionsResponse>(admin.PutAsJsonAsync(PermissionsUrl(registered.UserId),
-            new UpdateUserPermissionsRequest { Version = state.Version, Permissions = [Permissions.UsersCreate, Permissions.UsersDelete] }));
-
-        var created = await ApiAssert.Data<RegisterResponse>(user.PostAsJsonAsync(createUrl, request), HttpStatusCode.Created);
-        Assert.Equal(new[] { ApplicationRoles.User }, created.Roles);
-        var deleted = await ApiAssert.Data<DeleteUserResponse>(user.DeleteAsync($"/api/v1/adminusers/DeleteUser/{created.UserId}"));
-        Assert.Equal(created.UserId, deleted.UserId);
-        await using var database = factory.CreateDbContext();
-        Assert.False(await database.Users.AnyAsync(account => account.Id == created.UserId));
+        var failure = await ApiAssert.Response<object>(admin.PutAsJsonAsync(UpdatePermissionsUrl(registered.UserId),
+            new UpdateUserPermissionsRequest { Version = state.Version, Permissions = [forbiddenPermission] }), HttpStatusCode.BadRequest);
+        Assert.Equal(ErrorCodes.UserPermissions.InvalidSelection, failure.ErrorCode);
+        var current = await ApiAssert.Data<UserPermissionsResponse>(admin.GetAsync(PermissionsUrl(registered.UserId)));
+        Assert.Equal(state.Version, current.Version);
+        Assert.Equal(state.AssignedPermissions, current.AssignedPermissions);
+        Assert.Equal(state.EffectivePermissions, current.EffectivePermissions);
     }
 
     [Fact]
@@ -206,7 +211,7 @@ public sealed class PermissionManagementTests
 
         using var admin = await factory.LoginAsync(factory.AdminEmail);
         await ApiAssert.Data<DeleteUserResponse>(admin.DeleteAsync($"/api/v1/adminusers/DeleteUser/{registered.UserId}"));
-        await ApiAssert.Response<object>(manager.GetAsync("/api/v1/permissions/me"), HttpStatusCode.Unauthorized);
+        await ApiAssert.Response<object>(manager.GetAsync("/api/v1/permissions/GetMyPermissions"), HttpStatusCode.Unauthorized);
     }
 
     private static async Task<HttpClient> LoginActorAsync(PermissionApiFactory factory, string role)
