@@ -28,8 +28,8 @@ public static class IdentitySeeder
         await SeedRolesAsync(
             roleManager);
 
-        await SeedAdminPermissionsAsync(
-            roleManager);
+        await SeedRolePermissionsAsync(
+            scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
 
         await SeedInitialAdministratorAsync(
             userManager,
@@ -56,52 +56,31 @@ public static class IdentitySeeder
         }
     }
 
-    private static async Task SeedAdminPermissionsAsync(
-        RoleManager<IdentityRole> roleManager)
+    private static async Task SeedRolePermissionsAsync(ApplicationDbContext database)
     {
-        IdentityRole? adminRole =
-            await roleManager.FindByNameAsync(
-                ApplicationRoles.Admin);
-
-        if (adminRole is null)
+        foreach (string roleName in ApplicationRoles.All)
         {
-            throw new InvalidOperationException(
-                $"Role '{ApplicationRoles.Admin}' does not exist.");
-        }
+            IdentityRole role = await database.Roles.SingleAsync(role => role.Name == roleName);
+            List<IdentityRoleClaim<string>> existing = await database.RoleClaims
+                .Where(claim => claim.RoleId == role.Id && claim.ClaimType == CustomClaimTypes.Permission)
+                .ToListAsync();
+            IReadOnlyList<string> desired = RolePermissions.ForRole(roleName);
+            if (existing.Select(claim => claim.ClaimValue).OrderBy(value => value, StringComparer.Ordinal)
+                .SequenceEqual(desired, StringComparer.Ordinal)) continue;
 
-        IList<Claim> existingClaims =
-            await roleManager.GetClaimsAsync(
-                adminRole);
-
-        foreach (string permission in Permissions.All)
-        {
-            bool exists =
-                existingClaims.Any(
-                    claim =>
-                        claim.Type ==
-                            CustomClaimTypes.Permission
-                        &&
-                        string.Equals(
-                            claim.Value,
-                            permission,
-                            StringComparison.OrdinalIgnoreCase));
-
-            if (exists)
+            // Reconcile existing installations as well as new databases. Other role claims are preserved.
+            database.RoleClaims.RemoveRange(existing);
+            database.RoleClaims.AddRange(desired.Select(permission => new IdentityRoleClaim<string>
             {
-                continue;
-            }
-
-            IdentityResult result =
-                await roleManager.AddClaimAsync(
-                    adminRole,
-                    new Claim(
-                        CustomClaimTypes.Permission,
-                        permission));
-
-            EnsureSucceeded(
-                result,
-                $"Assigning permission '{permission}' to Admin role");
+                RoleId = role.Id,
+                ClaimType = CustomClaimTypes.Permission,
+                ClaimValue = permission
+            }));
+            role.ConcurrencyStamp = Guid.NewGuid().ToString();
         }
+
+        // Publish the complete role-permission matrix in one transaction.
+        await database.SaveChangesAsync();
     }
 
     private static async Task SeedInitialAdministratorAsync(

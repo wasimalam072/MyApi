@@ -136,14 +136,14 @@ public sealed class AuthServiceTests
         using var context = new AuthTestContext();
         context.Users.User = User();
         context.Users.RoleNames = [ApplicationRoles.User, ApplicationRoles.User.ToLowerInvariant()];
-        context.Users.Claims = [new Claim(CustomClaimTypes.Permission, "Test.Write")];
-        context.Roles.Claims[context.Roles.RolesByName[ApplicationRoles.User].Id] = [new Claim(CustomClaimTypes.Permission, "Test.Read")];
+        context.Users.Claims = [new Claim(CustomClaimTypes.Permission, Permissions.UsersUpdate)];
+        context.Roles.Claims[context.Roles.RolesByName[ApplicationRoles.User].Id] = [new Claim(CustomClaimTypes.Permission, Permissions.UsersView)];
 
         var response = await context.Service.LoginAsync(Login());
         Assert.Equal(200, response.StatusCode);
         Assert.Equal("test@example.com", context.Users.SearchedEmail);
         Assert.Equal(new[] { ApplicationRoles.User }, response.Data!.Roles);
-        Assert.Equal(new[] { "Test.Read", "Test.Write" }, response.Data.Permissions);
+        Assert.Equal(new[] { Permissions.UsersUpdate, Permissions.UsersView }, response.Data.Permissions);
 
         var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
         ClaimsPrincipal principal = handler.ValidateToken(response.Data.AccessToken, new TokenValidationParameters

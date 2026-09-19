@@ -10,48 +10,24 @@ public static class ErrorCodes
 {
     public static class Authentication
     {
-        public const string UserIdMissing =
-            "AUTH_USER_ID_MISSING";
-
-        public const string InvalidCredentials =
-            "AUTH_INVALID_CREDENTIALS";
-
-        public const string AccountLocked =
-            "AUTH_ACCOUNT_LOCKED";
-
-        public const string AccountExists =
-            "AUTH_ACCOUNT_EXISTS";
-
-        public const string ConfigurationError =
-            "AUTH_CONFIGURATION_ERROR";
-
+        public const string UserIdMissing = "AUTH_USER_ID_MISSING";
+        public const string InvalidCredentials = "AUTH_INVALID_CREDENTIALS";
+        public const string AccountLocked = "AUTH_ACCOUNT_LOCKED";
+        public const string AccountExists = "AUTH_ACCOUNT_EXISTS";
+        public const string ConfigurationError = "AUTH_CONFIGURATION_ERROR";
         public const string RegistrationFailed = "AUTH_REGISTRATION_FAILED";
-
         public const string RoleAssignmentFailed = "AUTH_ROLE_ASSIGNMENT_FAILED";
-
-        public const string InvalidApiKey =
-            "INVALID_API_KEY";
-
-        public const string Unauthorized =
-            "UNAUTHORIZED";
+        public const string InvalidApiKey = "INVALID_API_KEY";
+        public const string Unauthorized = "UNAUTHORIZED";
     }
 
     public static class Users
     {
-        public const string IdRequired =
-            "USER_ID_REQUIRED";
-
-        public const string NotFound =
-            "USER_NOT_FOUND";
-
-        public const string PhoneNumberAlreadyExists =
-            "USER_PHONE_NUMBER_ALREADY_EXISTS";
-
-        public const string UpdateFailed =
-            "USER_UPDATE_FAILED";
-
-        public const string DeleteFailed =
-            "USER_DELETE_FAILED";
+        public const string IdRequired = "USER_ID_REQUIRED";
+        public const string NotFound = "USER_NOT_FOUND";
+        public const string PhoneNumberAlreadyExists = "USER_PHONE_NUMBER_ALREADY_EXISTS";
+        public const string UpdateFailed = "USER_UPDATE_FAILED";
+        public const string DeleteFailed = "USER_DELETE_FAILED";
     }
 
     public static class UserPermissions
@@ -59,6 +35,15 @@ public static class ErrorCodes
         public const string InvalidSelection = "PERMISSIONS_INVALID_SELECTION";
         public const string VersionRequired = "PERMISSIONS_VERSION_REQUIRED";
         public const string Conflict = "PERMISSIONS_CONFLICT";
+    }
+
+    public static class UserRoles
+    {
+        public const string InvalidSelection = "ROLES_INVALID_SELECTION";
+        public const string VersionRequired = "ROLES_VERSION_REQUIRED";
+        public const string Conflict = "ROLES_CONFLICT";
+        public const string Forbidden = "ROLES_FORBIDDEN";
+        public const string SelfDemotion = "ROLES_SELF_DEMOTION";
     }
 
     public static class General

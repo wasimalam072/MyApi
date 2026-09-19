@@ -336,6 +336,7 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services)
     {
         services.AddScoped<IUserPermissionService, UserPermissionService>();
+        services.AddScoped<IUserRoleService, UserRoleService>();
         services.AddScoped<CurrentUserAuthorization>();
 
         services.AddScoped<

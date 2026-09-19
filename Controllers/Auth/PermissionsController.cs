@@ -15,7 +15,7 @@ public sealed class PermissionsController(IUserPermissionService permissionServi
 
     /// <summary>Lists permission names that can be assigned to a user.</summary>
     [Authorize(Roles = PermissionAdministrators)]
-    [HttpGet]
+    [HttpGet("[action]")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<PermissionDefinitionResponse>>), StatusCodes.Status200OK)]
     public IActionResult GetAvailablePermissions()
     {
@@ -24,7 +24,7 @@ public sealed class PermissionsController(IUserPermissionService permissionServi
     }
 
     /// <summary>Returns the authenticated user's current direct, inherited, and effective permissions.</summary>
-    [HttpGet("me")]
+    [HttpGet("[action]")]
     [ProducesResponseType(typeof(ApiResponse<UserPermissionsResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMyPermissions(CancellationToken cancellationToken)
@@ -35,7 +35,7 @@ public sealed class PermissionsController(IUserPermissionService permissionServi
 
     /// <summary>Retrieves a registered user's permissions and the version needed when editing them.</summary>
     [Authorize(Roles = PermissionAdministrators)]
-    [HttpGet("users/{userId}")]
+    [HttpGet("[action]/{userId}")]
     [ProducesResponseType(typeof(ApiResponse<UserPermissionsResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -50,7 +50,7 @@ public sealed class PermissionsController(IUserPermissionService permissionServi
     /// Role-inherited permissions are reported separately and cannot be removed here.
     /// </summary>
     [Authorize(Roles = PermissionAdministrators)]
-    [HttpPut("users/{userId}")]
+    [HttpPut("[action]/{userId}")]
     [ProducesResponseType(typeof(ApiResponse<UserPermissionsResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

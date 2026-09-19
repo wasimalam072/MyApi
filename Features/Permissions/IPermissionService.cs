@@ -7,7 +7,8 @@ public interface IPermissionService
 {
     /// <summary>
     /// Returns all permissions available to a user from both
-    /// direct user claims and claims inherited from assigned roles.
+    /// direct user claims and claims inherited from assigned roles,
+    /// limited to the permissions allowed by the user's current roles.
     /// </summary>
     Task<IReadOnlyList<string>> GetEffectivePermissionsAsync(
         ApplicationUser user,

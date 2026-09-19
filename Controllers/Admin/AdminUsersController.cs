@@ -1,6 +1,7 @@
 namespace MyApi.Controllers.Admin;
 
 [ApiController]
+[Authorize(Roles = ApplicationRoles.Admin + "," + ApplicationRoles.Manager)]
 [ApiVersion(VersionValue.Version_1)]
 [Route("api/v{version:apiVersion}/[controller]")]
 public sealed class AdminUsersController : ControllerBase
@@ -15,7 +16,7 @@ public sealed class AdminUsersController : ControllerBase
     /// <summary>
     /// Returns all registered application users.
     ///
-    /// The caller must have the Users.View permission.
+    /// Requires Admin or Manager and the Users.View permission.
     /// </summary>
     [Authorize(Policy = Permissions.UsersView)]
     [HttpGet("[action]")]
@@ -57,8 +58,7 @@ public sealed class AdminUsersController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> UpdateUser(
-        string userId, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateUser(string userId, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)
     {
         var response = await _adminUsersService.UpdateUserAsync(userId, request, cancellationToken);
         return StatusCode(response.StatusCode, response);
@@ -71,13 +71,14 @@ public sealed class AdminUsersController : ControllerBase
     /// Identity identifier of the user that will be deleted.
     /// </param>
     [Authorize(Policy = Permissions.UsersDelete)]
+    [Authorize(Roles = ApplicationRoles.Admin)]
     [HttpDelete("[action]/{userId}")]
     [Produces("application/json")]
     [ProducesResponseType(typeof(ApiResponse<DeleteUserResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<DeleteUserResponse>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ApiResponse<DeleteUserResponse>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteUser([FromRoute] string userId, CancellationToken cancellationToken)
     {

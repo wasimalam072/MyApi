@@ -1,6 +1,66 @@
 @MyApi_HostAddress = http://localhost:5093
+@ApiKey = replace-with-configured-api-key
+@AdminToken = replace-with-admin-access-token
+@ManagerToken = replace-with-manager-access-token
+@UserToken = replace-with-user-access-token
+@UserId = replace-with-target-user-id
+@UserVersion = replace-with-data.version-from-get
 
-GET {{MyApi_HostAddress}}/weatherforecast/
+### List supported roles and their permissions (Admin or Manager)
+GET {{MyApi_HostAddress}}/api/v1/roles
+ApiKey: {{ApiKey}}
+Authorization: Bearer {{AdminToken}}
 Accept: application/json
 
-###
+### Read roles and effective permissions before editing. Copy data.version into UserVersion.
+GET {{MyApi_HostAddress}}/api/v1/roles/GetUserRoles/{{UserId}}
+ApiKey: {{ApiKey}}
+Authorization: Bearer {{AdminToken}}
+
+### Admin appoints a Manager
+PUT {{MyApi_HostAddress}}/api/v1/roles/UpdateUserRoles/{{UserId}}
+ApiKey: {{ApiKey}}
+Authorization: Bearer {{AdminToken}}
+Content-Type: application/json
+
+{
+  "version": "{{UserVersion}}",
+  "roles": ["Manager", "User"]
+}
+
+### Manager reads an ordinary user's roles. Set UserId to that account and copy data.version.
+GET {{MyApi_HostAddress}}/api/v1/roles/GetUserRoles/{{UserId}}
+ApiKey: {{ApiKey}}
+Authorization: Bearer {{ManagerToken}}
+
+### Manager assigns User to an ordinary account. Managers cannot change privileged accounts.
+PUT {{MyApi_HostAddress}}/api/v1/roles/UpdateUserRoles/{{UserId}}
+ApiKey: {{ApiKey}}
+Authorization: Bearer {{ManagerToken}}
+Content-Type: application/json
+
+{
+  "version": "{{UserVersion}}",
+  "roles": ["User"]
+}
+
+### Read current roles and effective permissions with an existing token
+GET {{MyApi_HostAddress}}/api/v1/roles/GetMyRoles
+ApiKey: {{ApiKey}}
+Authorization: Bearer {{ManagerToken}}
+
+### User reads only their own profile
+GET {{MyApi_HostAddress}}/api/v1/users/GetCurrentUser
+ApiKey: {{ApiKey}}
+Authorization: Bearer {{UserToken}}
+
+### User updates only their own profile; the target comes from the token
+PUT {{MyApi_HostAddress}}/api/v1/users/UpdateUser
+ApiKey: {{ApiKey}}
+Authorization: Bearer {{UserToken}}
+Content-Type: application/json
+
+{
+  "fullName": "Updated User Name",
+  "phoneNumber": "+15555550200"
+}
